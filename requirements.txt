@@ -1,0 +1,4 @@
+tensorflow
+numpy
+music21
+matplotlib
