@@ -137,6 +137,7 @@ class MusicAutoencoder():
 
         self.prepare_data()
         self.model = self.autoencoder()
+        self.steps_per_epoch = len(self.train_notes)//BATCH_SIZE
 
     # def create_autoencoder(self):
     #         self.model = self.autoencoder(self.input_dim, self.latent_dim)
@@ -226,7 +227,7 @@ class MusicAutoencoder():
         # history = self.model.fit(self.trainNotesFlat, self.trainNotesFlat, epochs=500, callbacks=callbacks_list, batch_size=8)
         # tensor_dataset = tf.data.Dataset.from_tensors((self.trainNotesFlat, self.trainNotesFlat))
 
-        history = self.model.fit(x=self.data_generator(), epochs=EPOCHS, callbacks=callbacks_list, batch_size=BATCH_SIZE)
+        history = self.model.fit(x=self.data_generator(), epochs=EPOCHS, callbacks=callbacks_list, batch_size=BATCH_SIZE, steps_per_epoch=self.steps_per_epoch)
         print(history.history)
         print(MODEL_DIR_PATH + MODEL_NAME + "_" + CURR_DT + ".hdf5")
         self.model.save(os.path.join(MODEL_DIR_PATH, MODEL_NAME + "_" + CURR_DT + ".hdf5"))
