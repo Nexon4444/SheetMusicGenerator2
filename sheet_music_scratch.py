@@ -1,4 +1,4 @@
-#%%
+# %%
 
 import tensorflow as tf
 import numpy as np
@@ -18,18 +18,18 @@ if IS_ON_GOOGLE_COLAB:
 
     drive.mount('/content/drive')
 
-#%%
+# %%
 #
 # print(tf.test.is_gpu_available())
 # tf.config.list_physical_devices('GPU')
 
-#%%
+# %%
 
 import glob
 import os
 import pickle
 
-from music21 import converter, pitch, interval, instrument, note, note
+from music21 import converter, pitch, interval, instrument, chord, note
 import tensorflow as tf
 # Define save directory
 from music21.key import Key
@@ -55,8 +55,8 @@ TEST_RUN = False
 NORMALIZE_NOTES = True
 NORMALIZATION_BOUNDARIES = [3, 4]
 
-EPOCHS = 50
-BATCH_SIZE = 1024
+EPOCHS = 10
+BATCH_SIZE = 512
 AUTOENCODER = "AUTOENCODER"
 MODEL_NAME = AUTOENCODER
 
@@ -75,8 +75,8 @@ DATA_INT_TO_DURATION_PATH = os.path.join(DATA_DICTS_DIR, "int_to_duration_" + st
 DATA_NOTES_PATH = os.path.join(DATA_NOTES_DIR, "notes_" + str(CURR_DT))
 DATA_DURATIONS_PATH = os.path.join(DATA_DURATIONS_DIR, "durations_" + str(CURR_DT))
 
-MIDI_SONGS_DIR = os.path.join(FOLDER_ROOT, "midi_songs")
-# MIDI_SONGS_DIR = os.path.join(FOLDER_ROOT, "midi_songs_smaller")
+# MIDI_SONGS_DIR = os.path.join(FOLDER_ROOT, "midi_songs")
+MIDI_SONGS_DIR = os.path.join(FOLDER_ROOT, "midi_songs_smaller")
 MIDI_GENERATED_DIR = os.path.join(MODEL_FOLDER_ROOT, "midi_generated")
 MIDI_SONGS_REGEX = os.path.join(MIDI_SONGS_DIR, "*.mid")
 CHECKPOINTS_DIR = os.path.join(MODEL_FOLDER_ROOT, "checkpoints")
@@ -95,12 +95,11 @@ for path in all_paths:
     Path(path).mkdir(parents=True, exist_ok=True)
 
 
-
 # if __name__ == "__main__":
 #     create_train_data()
 # # Convert to one-hot encoding and swap note and sequence dimensions
 
-#%%
+# %%
 
 class MusicAutoencoder():
     def __init__(self, latent_dim, sequence_length, train_notes_path=None, train_durations_path=None,
@@ -135,9 +134,10 @@ class MusicAutoencoder():
             with open(train_notes_path, 'rb') as int_to_duration_file:
                 self.int_to_duration = pickle.load(int_to_duration_file)
 
+
         self.prepare_data()
         self.model = self.autoencoder()
-        self.steps_per_epoch = len(self.train_notes)//BATCH_SIZE
+        self.steps_per_epoch = len(self.train_notes) // BATCH_SIZE
 
     # def create_autoencoder(self):
     #         self.model = self.autoencoder(self.input_dim, self.latent_dim)
@@ -167,9 +167,13 @@ class MusicAutoencoder():
         """Replaces Keras' native ImageDataGenerator."""
         # i = 0
         # file_list = os.listdir(directory)
-
-        for batch in np.array_split(self.numpy_dataset, BATCH_SIZE):
-            yield batch, batch
+        # dataset = tf.data.Dataset.from_tensors(self.numpy_dataset).repeat(EPOCHS)
+        yielded_size = 0
+        for i in range(EPOCHS):
+            for batch in np.array_split(self.numpy_dataset, self.steps_per_epoch):
+                yielded_size += len(batch)
+                print(f" yielded_size: {yielded_size}")
+                yield batch, batch
 
     # def data_generator(self):
     #
@@ -180,18 +184,17 @@ class MusicAutoencoder():
     #         print(batch)
     #         yield batch
     #     # while True:
-        #     batch = []
-        #     for b in range(batch_size):
-        #         self.tensor_dataset.batch(BATCH_SIZE)
-        #         if i == len(file_list):
-        #             i = 0
-        #         sample = file_list[i]
-        #         i += 1
-        #         # image = cv2.resize(cv2.imread(sample[0]), INPUT_SHAPE)
-        #         # image_batch.append((image.astype(float) - 128) / 128)
-        #
-        #     yield np.array(image_batch)
-
+    #     batch = []
+    #     for b in range(batch_size):
+    #         self.tensor_dataset.batch(BATCH_SIZE)
+    #         if i == len(file_list):
+    #             i = 0
+    #         sample = file_list[i]
+    #         i += 1
+    #         # image = cv2.resize(cv2.imread(sample[0]), INPUT_SHAPE)
+    #         # image_batch.append((image.astype(float) - 128) / 128)
+    #
+    #     yield np.array(image_batch)
 
     def train(self, checkpoint_path=None):
         # Define number of samples, notes and notes, and input dimension
@@ -201,12 +204,13 @@ class MusicAutoencoder():
         if checkpoint_path:
             self.model.load_weights(checkpoint_path)
 
-        filepath = os.path.join(CHECKPOINT, "epoch={epoch:02d}-loss={loss:.4f}-acc={binary_accuracy:.4f}.hdf5")
+        # filepath = os.path.join(CHECKPOINT, "epoch={epoch:02d}-loss={loss:.4f}-acc={binary_accuracy:.4f}.hdf5")
+        filepath = os.path.join(CHECKPOINT, "epoch={epoch:02d}-loss={loss:.4f}-acc={categorical_accuracy:.4f}.hdf5")
 
         # filepath = "weights-improvement-{epoch:02d}-{loss:.4f}-bigger.hdf5"
         checkpoint = ModelCheckpoint(
             filepath,
-            monitor='binary_accuracy',
+            monitor='categorical_accuracy',
             verbose=0,
             save_best_only=True,
             mode='max'
@@ -217,8 +221,9 @@ class MusicAutoencoder():
         # history = self.model.fit(network_input, network_output, epochs=EPOCHS, batch_size=128, callbacks=callbacks_list)
         # model.save(MODEL_DIR_PATH + MODEL_NAME + "_" + CURR_DT + ".hdf5")
 
+        # self.model.compile(loss='binary_crossentropy', optimizer=RMSprop(learning_rate=0.001), metrics=[tf.keras.metrics.BinaryAccuracy()])
         self.model.compile(loss='binary_crossentropy', optimizer=RMSprop(learning_rate=0.01),
-                           metrics=[tf.keras.metrics.BinaryAccuracy()])
+                           metrics=[tf.keras.metrics.CategoricalAccuracy()])
         # self.model.compile(loss='binary_crossentropy', optimizer=RMSprop(learning_rate=0.01), metrics=["accuracy"])
         # Train autoencoder
         self.model.summary()
@@ -227,14 +232,19 @@ class MusicAutoencoder():
         # history = self.model.fit(self.trainNotesFlat, self.trainNotesFlat, epochs=500, callbacks=callbacks_list, batch_size=8)
         # tensor_dataset = tf.data.Dataset.from_tensors((self.trainNotesFlat, self.trainNotesFlat))
 
-        history = self.model.fit(x=self.data_generator(), epochs=EPOCHS, callbacks=callbacks_list, batch_size=BATCH_SIZE, steps_per_epoch=self.steps_per_epoch)
+        history = self.model.fit(x=self.data_generator(), epochs=EPOCHS, callbacks=callbacks_list,
+                                 batch_size=BATCH_SIZE, steps_per_epoch=self.steps_per_epoch)
+
+        print(f"steps_per_epoch: {self.steps_per_epoch}")
+        print(f"BATCH_SIZE: {BATCH_SIZE}")
+        print(f"len(self.train_notes): {len(self.train_notes)}")
         print(history.history)
         print(MODEL_DIR_PATH + MODEL_NAME + "_" + CURR_DT + ".hdf5")
         self.model.save(os.path.join(MODEL_DIR_PATH, MODEL_NAME + "_" + CURR_DT + ".hdf5"))
 
     def generate_notes(self):
-        generated_notes = self.decoder(np.random.normal(size=(1, self.latent_dim)))\
-            .numpy().reshape(self.n_notes, self.sequence_length)\
+        generated_notes = self.decoder(np.random.normal(size=(1, self.latent_dim))) \
+            .numpy().reshape(self.n_notes, self.sequence_length) \
             .argmax(0)
 
         generated_stream = stream.Stream()
@@ -284,16 +294,20 @@ class MusicAutoencoder():
             # song.transpose
             transp_int = transpose_amount(song)
             original_keys.append(str(song.analyze('key').transpose(transp_int)))
+
             for element in song:
                 if isinstance(element, note.Note):
                     original_notes[i].append(element.pitch.transpose(transp_int))
                     original_durations[i].append(element.duration.quarterLength)
-                elif isinstance(element, note.Note):
+
+                elif isinstance(element, chord.Chord):
                     original_notes[i].append('.'.join(str(n.transpose(transp_int)) for n in element.pitches))
                     original_durations[i].append(element.duration.quarterLength)
+
             print(str(original_keys[i]))
 
         c_notes = [c for (c, k) in zip(original_notes, original_keys) if (k == 'C major')]
+
         c_durations = [c for (c, k) in zip(original_durations, original_keys) if (k == 'C major')]
         # Map unique notes to integers
         unique_notes = np.unique([i for s in original_notes for i in s])
@@ -350,16 +364,17 @@ class MusicAutoencoder():
         # trainNotes = np.array(trainNotes, np.float32)
 
         n_samples = train_notes_categorical.shape[0]
-        n_notes = train_notes_categorical.shape[1]
-        self.input_dim = n_notes * self.sequence_length
+        self.n_notes = train_notes_categorical.shape[1]
+        self.input_dim = self.n_notes * self.sequence_length
         # Flatten sequence of notes into single dimension
-        train_notes_flattened = train_notes_categorical.reshape(n_samples, self.input_dim)
-        self.numpy_dataset = train_notes_flattened
+        self.numpy_dataset = train_notes_categorical.reshape(n_samples, self.input_dim)
+        # self.numpy_dataset = train_notes_categorical
         # self.tensor_dataset = tf.data.Dataset.from_tensors(tensors=(train_notes_flattened, train_notes_flattened))
 
         # return tensor_dataset, input_dim, train_durations, sequence_length, int_to_note, int_to_duration, n_notes
 
-#%%
+
+# %%
 
 class ModelFactory:
     def factory(self, model_type, use_computed_values):
@@ -371,7 +386,8 @@ class ModelFactory:
                 model = MusicAutoencoder(2, 32)
             return model
 
-#%%
+
+# %%
 
 modelFactory = ModelFactory()
 music_autoencoder = modelFactory.factory(MODEL_NAME, True)
