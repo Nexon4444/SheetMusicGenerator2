@@ -56,7 +56,7 @@ NORMALIZE_NOTES = True
 NORMALIZATION_BOUNDARIES = [3, 4]
 
 EPOCHS = 50
-BATCH_SIZE = 16
+BATCH_SIZE = 1024
 AUTOENCODER = "AUTOENCODER"
 MODEL_NAME = AUTOENCODER
 
@@ -112,6 +112,12 @@ class MusicAutoencoder():
         self.n_notes = None
         self.encoder = None
         self.decoder = None
+        self.numpy_dataset = None
+
+        self.train_notes_path = train_notes_path
+        self.train_durations_path = train_durations_path
+        self.int_to_note_path = int_to_note_path
+        self.int_to_duration_path = int_to_duration_path
 
         if train_notes_path is None or train_durations_path is None or int_to_note_path is None or int_to_duration_path is None:
             self.parse_songs()
@@ -161,9 +167,8 @@ class MusicAutoencoder():
         # i = 0
         # file_list = os.listdir(directory)
 
-        for batch in self.tensor_dataset.batch(BATCH_SIZE):
-            print(batch)
-            yield batch
+        for batch in np.array_split(self.numpy_dataset, BATCH_SIZE):
+            yield batch, batch
 
     # def data_generator(self):
     #
@@ -191,8 +196,6 @@ class MusicAutoencoder():
         # Define number of samples, notes and notes, and input dimension
         # filepath = CHECKPOINTS + "weights-improvement-{epoch:02d}-{loss:.4f}-{categorical_accuracy:.4f}-bigger.hdf5"
         # filepath = "weights-improvement-epoch:{epoch:02d}-loss:{loss:.4f}-cat_acc:{categorical_accuracy:.4f}.hdf5"
-
-        print(str("Current datatime: " + CURR_DT))
 
         if checkpoint_path:
             self.model.load_weights(checkpoint_path)
@@ -223,7 +226,7 @@ class MusicAutoencoder():
         # history = self.model.fit(self.trainNotesFlat, self.trainNotesFlat, epochs=500, callbacks=callbacks_list, batch_size=8)
         # tensor_dataset = tf.data.Dataset.from_tensors((self.trainNotesFlat, self.trainNotesFlat))
 
-        history = self.model.fit(self.data_generator(), epochs=EPOCHS, callbacks=callbacks_list, batch_size=BATCH_SIZE)
+        history = self.model.fit(x=self.data_generator(), epochs=EPOCHS, callbacks=callbacks_list, batch_size=BATCH_SIZE)
         print(history.history)
         print(MODEL_DIR_PATH + MODEL_NAME + "_" + CURR_DT + ".hdf5")
         self.model.save(os.path.join(MODEL_DIR_PATH, MODEL_NAME + "_" + CURR_DT + ".hdf5"))
@@ -262,7 +265,7 @@ class MusicAutoencoder():
         original_keys = []
 
         def transpose_amount(score):
-            return -int(score.noteify().analyze('key').tonic.ps % 12)
+            return -int(score.chordify().analyze('key').tonic.ps % 12)
 
         def monophonic(stream):
             try:
@@ -350,7 +353,8 @@ class MusicAutoencoder():
         self.input_dim = n_notes * self.sequence_length
         # Flatten sequence of notes into single dimension
         train_notes_flattened = train_notes_categorical.reshape(n_samples, self.input_dim)
-        self.tensor_dataset = tf.data.Dataset.from_tensors(tensors=(train_notes_flattened, train_notes_flattened))
+        self.numpy_dataset = train_notes_flattened
+        # self.tensor_dataset = tf.data.Dataset.from_tensors(tensors=(train_notes_flattened, train_notes_flattened))
 
         # return tensor_dataset, input_dim, train_durations, sequence_length, int_to_note, int_to_duration, n_notes
 

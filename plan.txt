@@ -1,2 +1,2 @@
 1) działanie autoencodera
-1) działanie autoencodera
+2) Mam problem z tym: WARNING:tensorflow:Your input ran out of data; interrupting training. Make sure that your dataset or generator can generate at least `steps_per_epoch * epochs` batches (in this case, 51200 batches). You may need to use the repeat() function when building your dataset.
