@@ -1,0 +1,1 @@
+copy sheet_music_generator2.ipynb C:\Users\Nexon\Documents\aitraining0001

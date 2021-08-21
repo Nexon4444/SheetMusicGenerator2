@@ -2,3 +2,4 @@ tensorflow
 numpy
 music21
 matplotlib
+scikit-learn
