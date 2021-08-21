@@ -1,0 +1,11 @@
+AUTOENCODER PERFORMANCE
+
+The most direct way is measuring the reconstruction error. For image samples specifically, this is achieved through MSE loss.
+
+This is not the entire story though. You want your autoencoder to learn the smallest number of important features, not just minimizing the reconstruction error. There are several ways this can be achieved:
+
+add a regularization term to the MSE Loss. This is usually the L1 or L2 loss penalty on the weights, but can also be KL divergence loss.
+Start with an autoencoder with an encoder network with a much smaller dimension than the input space (i.e. if you were working with MNIST samples which are 28x28=784 dimensional, your encoder should have say 200 weights rather than 784) and work your way up to larger ones.
+Manually zero all weights except for the K largest. This is what K-sparse autoencoders do
+Use neuroevolution (genetic algorithms for evolving neural net architecture) to evolve multiple autoencoders over multiple generations. The fitness function should be maximized when the reconstruction loss is low AND the model is small (fewest number of weights). A basic fitness function you could use would be: fitness=-(loss + num weights)
+Note that the fitness function is not expensive to compute, which is helpful because you’ll have a quadruple loop in the training script if you want to use neuroevolution to evolve autoencoders: (loop over batches, then epochs, then over the number of models, then generations)
